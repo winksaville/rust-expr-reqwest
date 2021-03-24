@@ -5,31 +5,50 @@ https://github.com/seanmonstar/reqwest
 
 ## Get binance.us time
 
-New code git get the server time:
-```
-use std::collections::HashMap;
+Testing we can get `exchangeInfo`, `depth` and `avgPrice`
+using a `query string` in the url:
 
+```
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let url = "https://binance.us/api/v3/time";
-    let resp = reqwest::get(url)
+    let url =
+        //"https://binance.us/api/v3/exchangeInfo"
+        //"https://binance.us/api/v3/depth?symbol=BTCUSDT&limit=5"
+        "https://binance.us/api/v3/avgPrice?symbol=BTCUSDT"
+    ;
+    let resp_json: serde_json::Value = reqwest::Client::new()
+        .get(url)
+        .send()
         .await?
-        .json::<HashMap<String, u64>>()
+        .json()
         .await?;
-    println!("{:#?}", resp);
+
+    println!("{:#?}", resp_json);
+
     Ok(())
 }
 ```
-Run it
+Run itm, first sends output to `data/avgPrice-BTCUSDT-2021-03-24.txt`
+and the second just sends it to the console via `stdout`:
 ```
 wink@3900x:~/prgs/rust/projects/expr-reqwest (main)
-$ cargo run
+$ cargo run --release > data/avgPrice-BTCUSDT-2021-03-24.txt 
    Compiling expr-reqwest v0.1.0 (/home/wink/prgs/rust/projects/expr-reqwest)
-    Finished dev [unoptimized + debuginfo] target(s) in 1.46s
-     Running `target/x86_64-unknown-linux-gnu/debug/expr-reqwest`
-{
-    "serverTime": 1616620760536,
-}
+    Finished release [optimized] target(s) in 1.12s
+     Running `target/x86_64-unknown-linux-gnu/release/expr-reqwest`
+
+wink@3900x:~/prgs/rust/projects/expr-reqwest (main)
+$ cargo run --release
+    Finished release [optimized] target(s) in 0.03s
+     Running `target/x86_64-unknown-linux-gnu/release/expr-reqwest`
+Object({
+    "mins": Number(
+        5,
+    ),
+    "price": String(
+        "52474.79722740",
+    ),
+})
 ```
 
 ## Initial commits

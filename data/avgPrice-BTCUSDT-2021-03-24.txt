@@ -1,0 +1,8 @@
+Object({
+    "mins": Number(
+        5,
+    ),
+    "price": String(
+        "52478.95305503",
+    ),
+})
