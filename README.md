@@ -3,6 +3,37 @@
 https://lib.rs/crates/reqwest
 https://github.com/seanmonstar/reqwest
 
+## Get binance.us time
+
+New code git get the server time:
+```
+use std::collections::HashMap;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let url = "https://binance.us/api/v3/time";
+    let resp = reqwest::get(url)
+        .await?
+        .json::<HashMap<String, u64>>()
+        .await?;
+    println!("{:#?}", resp);
+    Ok(())
+}
+```
+Run it
+```
+wink@3900x:~/prgs/rust/projects/expr-reqwest (main)
+$ cargo run
+   Compiling expr-reqwest v0.1.0 (/home/wink/prgs/rust/projects/expr-reqwest)
+    Finished dev [unoptimized + debuginfo] target(s) in 1.46s
+     Running `target/x86_64-unknown-linux-gnu/debug/expr-reqwest`
+{
+    "serverTime": 1616620760536,
+}
+```
+
+## Initial commits
+
 A "regular" dynamic lib build works with `-gnu` target:
 ```
 wink@3900x:~/prgs/rust/projects/expr-reqwest (main)
