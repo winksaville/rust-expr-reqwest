@@ -1,9 +1,11 @@
 #![feature(test)]
 
 mod utils;
+use utils::{de_string_or_number_to_f64, de_string_or_number_to_u64};
+
+use reqwest;
 
 use serde::{Deserialize, Serialize};
-use utils::{de_string_or_number_to_f64, de_string_or_number_to_u64};
 
 #[derive(Debug, Deserialize, Serialize)]
 struct AvgPrice {
@@ -18,11 +20,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let url =
         //"https://binance.us/api/v3/exchangeInfo"
         //"https://binance.us/api/v3/depth?symbol=BTCUSDT&limit=5"
-        "https://binance.us/api/v3/avgPrice?symbol=BTCUSDT"
+        //"https://binance.us/api/v3/avgPrice?symbol=BTCUSDT"
+        "https://binance.us/api/v3/avgPrice?symbol=CAKEBTC"
     ;
 
     // Some variant implementations
-    match 1u8 {
+    match 2u8 {
         0 => {
             // Using value
             let resp_json = reqwest::Client::new().get(url).send().await?.json().await?;
@@ -41,7 +44,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         2 => {
             // Separate the getting the response and converting to json
-            let resp = reqwest::Client::new().get(url).send().await?;
+
+            let client = reqwest::Client::new();
+            let req_builder = client.get(url);
+            println!("req_builder={:#?}", req_builder);
+
+            let resp = req_builder.send().await?;
             println!("resp={:#?}", resp);
 
             let resp_json = resp.text().await?;
