@@ -1,7 +1,7 @@
 #![feature(test)]
 
-mod utils;
-use utils::{de_string_or_number_to_f64, de_string_or_number_to_u64};
+mod de_string_or_number;
+use de_string_or_number::{de_string_or_number_to_f64, de_string_or_number_to_u64};
 
 use reqwest;
 
