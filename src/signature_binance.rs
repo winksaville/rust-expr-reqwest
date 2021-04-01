@@ -1,3 +1,8 @@
+// TODO: Add support for body
+// TODO: Add tests that contain multi-byte utf8 characters and make any necessary changes
+// TODO: Immplement test_binance_signature_body_only
+// TODO: Immplement test_binance_signature_query_string_and_body
+
 use hmac_sha256::HMAC;
 
 pub fn query_vec_u8(query_params: &Vec<(&str, &str)>) -> Vec<u8> {
@@ -160,4 +165,5 @@ mod test {
     fn test_binance_signature_query_string_and_body() {
         // TODO: test_binance_signature_query_string_and_body
     }
+
 }
