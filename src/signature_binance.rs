@@ -1,5 +1,6 @@
 // TODO: Add support for body
 // TODO: Add tests that contain multi-byte utf8 characters and make any necessary changes
+// TODO: Add url/uri/percent encoding: https://en.wikipedia.org/wiki/Percent-encoding
 // TODO: Immplement test_binance_signature_body_only
 // TODO: Immplement test_binance_signature_query_string_and_body
 
