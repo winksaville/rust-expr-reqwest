@@ -26,14 +26,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         //"https://binance.us/api/v3/exchangeInfo"
         //"https://binance.us/api/v3/depth?symbol=BTCUSDT&limit=5"
         //"https://binance.us/api/v3/avgPrice?symbol=BTCUSDT"
-        "https://binance.us/api/v3/avgPrice?symbol=CAKEBTC"
+        "https://api.binance.us/api/v3/avgPrice?symbol=BTCUSDT"
     ;
 
     // Some variant implementations
-    match 2u8 {
+    match 3u8 {
         0 => {
             // Using value
-            let resp_json = reqwest::Client::new().get(url).send().await?.json().await?;
+            let resp_json = reqwest::Client::new().post(url).send().await?.json().await?;
             println!("resp_json={:#?}", resp_json);
 
             let avg_price: AvgPrice = serde_json::from_value(resp_json).unwrap();
@@ -51,6 +51,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // Separate the getting the response and converting to json
 
             let client = reqwest::Client::new();
+            let req_builder = client.get(url);
+            println!("req_builder={:#?}", req_builder);
+
+            let resp = req_builder.send().await?;
+            println!("resp={:#?}", resp);
+
+            let resp_json = resp.text().await?;
+            println!("resp_json={:#?}", resp_json);
+
+            let avg_price: AvgPrice = serde_json::from_str(&resp_json).unwrap();
+            println!("avg_price={:#?}", avg_price);
+        }
+        3 => {
+            // Use a proxy so we use wireshark to see the traffic
+            let client = reqwest::Client::builder()
+                .proxy(reqwest::Proxy::https("http://localhost:8080")?)
+                .build()?;
+
+            let resp_json= client.get(url).send().await?.text().await?;
+            println!("resp_json={:#?}", resp_json);
+
+            let avg_price: AvgPrice = serde_json::from_str(&resp_json).unwrap();
+            println!("avg_price={:#?}", avg_price);
+        }
+        4 => {
+            // Break down code more for more visibility
+            let client = reqwest::Client::builder()
+                .proxy(reqwest::Proxy::https("http://localhost:8080")?)
+                .build()?;
+
             let req_builder = client.get(url);
             println!("req_builder={:#?}", req_builder);
 
