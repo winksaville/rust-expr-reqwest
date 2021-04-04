@@ -10,24 +10,26 @@ pub fn query_vec_u8(query_params: &Vec<(&str, &str)>) -> Vec<u8> {
     let mut qs = Vec::<u8>::with_capacity(1024);
 
     for (i, kv) in query_params.iter().enumerate() {
-
         let (k, v) = kv;
         // println!("query_str: i={}: k={:?} v={:?}", i, k, v);
         let kv_pair = format!("{}={}", k, v);
-        
+
         if i > 0 {
             // println!("query_str: append i={} '&'", i);
             qs.append(&mut vec![b'&']);
         }
         qs.append(&mut kv_pair.into_bytes());
-    };
+    }
 
     // println!("query_str: qs=\"{}\"", String::from_utf8(qs.clone()).unwrap());
     qs
 }
 
-
-pub fn binance_signature(sig_key: &[u8], query_params: &Vec<(&str, &str)>, _body: &[u8]) -> [u8; 32] {
+pub fn binance_signature(
+    sig_key: &[u8],
+    query_params: &Vec<(&str, &str)>,
+    _body: &[u8],
+) -> [u8; 32] {
     let qs = query_vec_u8(query_params);
     // println!("binance_signature: qs=\"{}\"", String::from_utf8(qs.clone()).unwrap());
 
@@ -166,5 +168,4 @@ mod test {
     fn test_binance_signature_query_string_and_body() {
         // TODO: test_binance_signature_query_string_and_body
     }
-
 }
