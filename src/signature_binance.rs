@@ -1,8 +1,10 @@
-// TODO: In binance_signature see if HMAC::mac can be incremental
 // TODO: Add tests that contain multi-byte utf8 characters and make any necessary changes
 // TODO: Add url/uri/percent encoding: https://en.wikipedia.org/wiki/Percent-encoding
 
-use hmac_sha256::HMAC;
+use hmac::{Hmac, Mac, NewMac};
+use sha2::Sha256;
+
+type HmacSha256 = Hmac<Sha256>;
 
 pub fn query_vec_u8(query_params: &Vec<(&str, &str)>) -> Vec<u8> {
     let mut qs = Vec::<u8>::with_capacity(1024);
@@ -23,21 +25,18 @@ pub fn query_vec_u8(query_params: &Vec<(&str, &str)>) -> Vec<u8> {
     qs
 }
 
-pub fn binance_signature(
-    sig_key: &[u8],
-    qs: &Vec<u8>,
-    body: &Vec<u8>,
-) -> [u8; 32] {
+pub fn binance_signature(sig_key: &[u8], qs: &Vec<u8>, body: &Vec<u8>) -> [u8; 32] {
     // println!("binance_signature: qs=\"{}\"", String::from_utf8(qs.clone()).unwrap());
     // println!("binance_signature: body=\"{}\"", String::from_utf8(body.clone()).unwrap());
-    let mut qs_and_body = qs.clone();
-    qs_and_body.append(&mut body.clone());
-    // println!("binance_signature: qs_and_body=\"{}\"", String::from_utf8(qs_and_body.clone()).unwrap());
 
-    let signature = HMAC::mac(&qs_and_body, sig_key);
-    // println!("binance_signature: {:02x?}", signature);
+    let mut mac = HmacSha256::new_varkey(sig_key).unwrap();
+    mac.update(qs);
+    mac.update(body);
+    let signature = mac.finalize().into_bytes();
 
-    signature
+    // println!("binance_signature: len={} {:02x?}", signature.len(), signature);
+
+    signature.into()
 }
 
 #[cfg(test)]
@@ -100,7 +99,9 @@ mod test {
         let expected = hex!("c8db56825ae71d6d79447849e617115f4a920fa2acdcab2b053c4b2838bd6b71");
 
         // Calculate the signature from the data and sig_key
-        let signature = HMAC::mac(data, sig_key);
+        let mut mac = HmacSha256::new_varkey(sig_key).unwrap();
+        mac.update(data);
+        let signature: [u8; 32] = mac.finalize().into_bytes().into();
         // println!("signature ={:02x?}", signature);
 
         // Validate
@@ -197,7 +198,7 @@ mod test {
             ("type", "LIMIT"),
             ("timeInForce", "GTC"),
         ];
-        
+
         let body_params = vec![
             ("quantity", "1"),
             ("price", "0.1"),
@@ -206,8 +207,6 @@ mod test {
         ];
         let sig_key = b"NhqPtmdSJYdKjVHjA7PZj4Mge3R5YNiP1e3UZjInClVN65XAbvqqM6A7H5fATj0j";
         let expected = hex!("0fd168b8ddb4876a0358a8d14d0c9f3da0e9b20c5d52b2a00fcf7d1c602f9a77");
-
-        //let query_params = vec![("symbol", "LTCBTC")];
 
         let qs = query_vec_u8(&query_params);
         let body = query_vec_u8(&body_params);
