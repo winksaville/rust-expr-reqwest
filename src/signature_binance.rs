@@ -1,8 +1,6 @@
-// TODO: Add support for body
+// TODO: In binance_signature see if HMAC::mac can be incremental
 // TODO: Add tests that contain multi-byte utf8 characters and make any necessary changes
 // TODO: Add url/uri/percent encoding: https://en.wikipedia.org/wiki/Percent-encoding
-// TODO: Immplement test_binance_signature_body_only
-// TODO: Immplement test_binance_signature_query_string_and_body
 
 use hmac_sha256::HMAC;
 
@@ -27,14 +25,16 @@ pub fn query_vec_u8(query_params: &Vec<(&str, &str)>) -> Vec<u8> {
 
 pub fn binance_signature(
     sig_key: &[u8],
-    query_params: &Vec<(&str, &str)>,
-    _body: &[u8],
+    qs: &Vec<u8>,
+    body: &Vec<u8>,
 ) -> [u8; 32] {
-    let qs = query_vec_u8(query_params);
     // println!("binance_signature: qs=\"{}\"", String::from_utf8(qs.clone()).unwrap());
+    // println!("binance_signature: body=\"{}\"", String::from_utf8(body.clone()).unwrap());
+    let mut qs_and_body = qs.clone();
+    qs_and_body.append(&mut body.clone());
+    // println!("binance_signature: qs_and_body=\"{}\"", String::from_utf8(qs_and_body.clone()).unwrap());
 
-    // TODO: body is being ignored.
-    let signature = HMAC::mac(&qs, sig_key);
+    let signature = HMAC::mac(&qs_and_body, sig_key);
     // println!("binance_signature: {:02x?}", signature);
 
     signature
@@ -67,7 +67,7 @@ mod test {
     #[test]
     fn test_query_vec_u8() {
         // query string from:
-        //   https://github.com/binance-us/binance-official-api-docs/blob/fc916164ae04eb2e95ff7f98c2d49d8d6bd6d096/rest-api.md#example-2-as-a-query-string
+        //   https://github.com/binance-us/binance-official-api-docs/blob/5a1dd14437bd3be4631778e78d3203014cf30b63/rest-api.md#example-1-as-a-request-body
         let expected = b"symbol=LTCBTC&side=BUY&type=LIMIT&timeInForce=GTC&quantity=1&price=0.1&recvWindow=5000&timestamp=1499827319559";
 
         let query_params = vec![
@@ -94,7 +94,7 @@ mod test {
     #[test]
     fn test_binance_example() {
         // Data, sig_key and expected from:
-        //   https://github.com/binance-us/binance-official-api-docs/blob/fc916164ae04eb2e95ff7f98c2d49d8d6bd6d096/rest-api.md#example-2-as-a-query-string
+        //   https://github.com/binance-us/binance-official-api-docs/blob/5a1dd14437bd3be4631778e78d3203014cf30b63/rest-api.md#example-1-as-a-request-body
         let data = b"symbol=LTCBTC&side=BUY&type=LIMIT&timeInForce=GTC&quantity=1&price=0.1&recvWindow=5000&timestamp=1499827319559";
         let sig_key = b"NhqPtmdSJYdKjVHjA7PZj4Mge3R5YNiP1e3UZjInClVN65XAbvqqM6A7H5fATj0j";
         let expected = hex!("c8db56825ae71d6d79447849e617115f4a920fa2acdcab2b053c4b2838bd6b71");
@@ -110,18 +110,45 @@ mod test {
 
     #[test]
     fn test_binance_signature_no_query_string_no_body() {
-        // query_params, sig_key from:
-        //   https://github.com/binance-us/binance-official-api-docs/blob/fc916164ae04eb2e95ff7f98c2d49d8d6bd6d096/rest-api.md#example-2-as-a-query-string
-        let query_params = vec![];
         let sig_key = b"NhqPtmdSJYdKjVHjA7PZj4Mge3R5YNiP1e3UZjInClVN65XAbvqqM6A7H5fATj0j";
 
         // Expected is "self" calculated so NOT indpendently verified
         let expected = hex!("18f82ab1c4ba20d60cb86ebc4cab5b54ddb974cdf7832421345148e7a7f9466e");
 
-        let body = [];
+        let qs = Vec::<u8>::new();
+        let body = Vec::<u8>::new();
 
         // Calculate the signature from the data and key
-        let signature = binance_signature(sig_key, &query_params, &body);
+        let signature = binance_signature(sig_key, &qs, &body);
+        // println!("signature:         {:02x?}", signature);
+
+        // Validate
+        assert_eq!(signature.len(), 32);
+        assert_eq!(signature, expected);
+    }
+
+    #[test]
+    fn test_binance_signature_body_only() {
+        // query_params, sig_key and expected from:
+        //   https://github.com/binance-us/binance-official-api-docs/blob/5a1dd14437bd3be4631778e78d3203014cf30b63/rest-api.md#example-1-as-a-request-body
+        let query_params = vec![
+            ("symbol", "LTCBTC"),
+            ("side", "BUY"),
+            ("type", "LIMIT"),
+            ("timeInForce", "GTC"),
+            ("quantity", "1"),
+            ("price", "0.1"),
+            ("recvWindow", "5000"),
+            ("timestamp", "1499827319559"),
+        ];
+        let sig_key = b"NhqPtmdSJYdKjVHjA7PZj4Mge3R5YNiP1e3UZjInClVN65XAbvqqM6A7H5fATj0j";
+        let expected = hex!("c8db56825ae71d6d79447849e617115f4a920fa2acdcab2b053c4b2838bd6b71");
+
+        let qs = Vec::<u8>::new();
+        let body = query_vec_u8(&query_params);
+
+        // Calculate the signature from the data and key
+        let signature = binance_signature(sig_key, &qs, &body);
         // println!("signature:         {:02x?}", signature);
 
         // Validate
@@ -132,7 +159,7 @@ mod test {
     #[test]
     fn test_binance_signature_query_string_only() {
         // query_params, sig_key and expected from:
-        //   https://github.com/binance-us/binance-official-api-docs/blob/fc916164ae04eb2e95ff7f98c2d49d8d6bd6d096/rest-api.md#example-2-as-a-query-string
+        //   https://github.com/binance-us/binance-official-api-docs/blob/5a1dd14437bd3be4631778e78d3203014cf30b63/rest-api.md#example-2-as-a-query-string
         let query_params = vec![
             ("symbol", "LTCBTC"),
             ("side", "BUY"),
@@ -148,10 +175,11 @@ mod test {
 
         //let query_params = vec![("symbol", "LTCBTC")];
 
-        let body = [];
+        let qs = query_vec_u8(&query_params);
+        let body = Vec::new();
 
         // Calculate the signature from the data and key
-        let signature = binance_signature(sig_key, &query_params, &body);
+        let signature = binance_signature(sig_key, &qs, &body);
         // println!("signature:         {:02x?}", signature);
 
         // Validate
@@ -160,12 +188,36 @@ mod test {
     }
 
     #[test]
-    fn test_binance_signature_body_only() {
-        // TODO: test_binance_signature_body_only
-    }
-
-    #[test]
     fn test_binance_signature_query_string_and_body() {
-        // TODO: test_binance_signature_query_string_and_body
+        // query_params, sig_key and expected from:
+        //   https://github.com/binance-us/binance-official-api-docs/blob/5a1dd14437bd3be4631778e78d3203014cf30b63/rest-api.md#example-3-mixed-query-string-and-request-body
+        let query_params = vec![
+            ("symbol", "LTCBTC"),
+            ("side", "BUY"),
+            ("type", "LIMIT"),
+            ("timeInForce", "GTC"),
+        ];
+        
+        let body_params = vec![
+            ("quantity", "1"),
+            ("price", "0.1"),
+            ("recvWindow", "5000"),
+            ("timestamp", "1499827319559"),
+        ];
+        let sig_key = b"NhqPtmdSJYdKjVHjA7PZj4Mge3R5YNiP1e3UZjInClVN65XAbvqqM6A7H5fATj0j";
+        let expected = hex!("0fd168b8ddb4876a0358a8d14d0c9f3da0e9b20c5d52b2a00fcf7d1c602f9a77");
+
+        //let query_params = vec![("symbol", "LTCBTC")];
+
+        let qs = query_vec_u8(&query_params);
+        let body = query_vec_u8(&body_params);
+
+        // Calculate the signature from the data and key
+        let signature = binance_signature(sig_key, &qs, &body);
+        // println!("signature:         {:02x?}", signature);
+
+        // Validate
+        assert_eq!(signature.len(), 32);
+        assert_eq!(signature, expected);
     }
 }
