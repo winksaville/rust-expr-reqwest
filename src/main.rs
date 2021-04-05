@@ -10,9 +10,13 @@ mod signature_binance;
 
 use signature_binance::{binance_signature, query_vec_u8};
 
+use hex;
 use reqwest;
 
 use serde::{Deserialize, Serialize};
+
+const TEST_BY_WINK20210309: &[u8] =
+    b"sx6bFVKosMPoNsX3OHadmYfXGxkU9s7XRKIw8FwvNIGLFBJcciUaOxxrzoBkwPKq";
 
 fn test() {
     // query_params, sig_key and expected from:
@@ -38,7 +42,24 @@ fn test() {
 
     // Calculate the signature from the data and key
     let signature = binance_signature(sig_key, &qs, &body);
-    println!("signature:         {:02x?}", signature);
+    println!("signature= {}", hex::encode(signature));
+
+    let public_key = TEST_BY_WINK20210309.to_vec();
+    let secret_key = match std::env::var("SECRET_KEY") {
+        Ok(val) => val.into_bytes(),
+        Err(e) => {
+            println!("Secret key Err: {}", e);
+            vec![]
+        }
+    };
+    println!(
+        "secret_key={}",
+        String::from_utf8(secret_key.clone()).unwrap()
+    );
+    println!(
+        "public_key={}",
+        String::from_utf8(public_key.clone()).unwrap()
+    );
 
     // Validate
     assert_eq!(signature.len(), 32);
@@ -55,12 +76,10 @@ struct AvgPrice {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let url =
-        //"https://binance.us/api/v3/exchangeInfo"
-        //"https://binance.us/api/v3/depth?symbol=BTCUSDT&limit=5"
-        //"https://binance.us/api/v3/avgPrice?symbol=BTCUSDT"
-        //"https://api.binance.us/api/v3/avgPrice?symbol=BTCUSDT"
-        "https://binance.us/api/v3/avgPrice?symbol=BTCUSDT"
+    let path =
+        "/api/v3/avgPrice?symbol=BTCUSDT"
+        //"/api/v3/depth?symbol=BTCUSDT&limit=5"
+        //"/api/v3/exchangeInfo"
     ;
 
     test();
@@ -68,6 +87,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Some variant implementations
     match 2u8 {
         0 => {
+            // For POST's use binance.us
+            let url = "https://binance.us".to_string() + path;
+
             // Using value
             let resp_json = reqwest::Client::new()
                 .post(url)
@@ -82,6 +104,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         1 => {
             // Using text, this would seem to require less processing?
+            // For GET's use api.binance.us so as to eliminate the 301 redirect error
+            let url = "https://api.binance.us".to_string() + path;
+
             let resp_json = reqwest::Client::new().get(url).send().await?.text().await?;
             println!("resp_json={:#?}", resp_json);
 
@@ -90,6 +115,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         2 => {
             // Separate the getting the response and converting to json
+            // For GET's use api.binance.us so as to eliminate the 301 redirect error
+            let url = "https://api.binance.us".to_string() + path;
 
             let client = reqwest::Client::new();
             let req_builder = client.get(url);
@@ -105,6 +132,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("avg_price={:#?}", avg_price);
         }
         3 => {
+            // For POST's use binance.us
+            let url = "https://binance.us".to_string() + path;
+
             // Use a proxy so we use wireshark to see the traffic
             let resp = reqwest::Client::builder()
                 .proxy(reqwest::Proxy::https("http://localhost:8080")?)
