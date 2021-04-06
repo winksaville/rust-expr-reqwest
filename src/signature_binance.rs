@@ -45,6 +45,9 @@ mod test {
     //   https://github.com/rust-analyzer/rust-analyzer/issues/6714
     extern crate test;
 
+    use hex_literal::hex;
+
+
     use super::*;
     //use test::Bencher;
 
