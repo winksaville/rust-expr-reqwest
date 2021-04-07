@@ -60,7 +60,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ;
 
     // Some variant implementations
-    match 4u8 {
+    match 5u8 {
         0 => {
             // For POST's use binance.us
             let url = "https://binance.us".to_string() + path;
@@ -135,6 +135,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         4 => {
+            println!("Order Test");
+
             let sig_key = get_env_var("SECRET_KEY").into_bytes();
             let api_key = get_env_var("API_KEY");
 
@@ -180,7 +182,68 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Ok(response) => {
                     if response.status() == 200 {
                         let resp_json = response.text().await?;
-                        println!("resp_json={:#?}", resp_json);
+                        println!("resp_json={}", resp_json);
+                    } else {
+                        println!("response status={}", response.status());
+                    }
+                }
+                Err(err) => println!("err: {}", err),
+            }
+        }
+        5 => {
+            println!("Get Account Information");
+
+            let sig_key = get_env_var("SECRET_KEY").into_bytes();
+            let api_key = get_env_var("API_KEY");
+
+            let mut params = vec![];
+            let ts_string: String = format!("{}", time_ms_utc_now());
+            params.append(&mut vec![("timestamp", ts_string.as_str())]);
+
+            let mut query = query_vec_u8(&params);
+
+            // Calculate the signature using sig_key and the data is qs and query as body
+            let signature = binance_signature(&sig_key, &vec![], &query);
+
+            // Append the signature to query
+            append_signature(&mut query, signature);
+
+            // Convert to a string
+            let query_string = String::from_utf8(query).unwrap();
+            println!("query_string={}", &query_string);
+
+            let path = "/api/v3/account";
+            let url = "https://api.binance.us".to_string() + path + "?" + &query_string;
+
+            // Build request
+            let client = reqwest::Client::builder();
+            let req_builder = client
+                .proxy(reqwest::Proxy::https("http://localhost:8080")?)
+                .build()?
+                .get(url)
+                .header("X-MBX-APIKEY", api_key);
+            println!("req_builder={:#?}", req_builder);
+
+            // Send and get response
+            let resp = req_builder.send().await;
+            println!("resp={:#?}", &resp);
+            match resp {
+                Ok(response) => {
+                    if response.status() == 200 {
+                        let resp_json = response.text().await;
+                        match resp_json {
+                            Ok(resp) => {
+                                let val: Result<serde_json::Value, _> = serde_json::from_str(&resp);
+                                match val {
+                                    Ok(json_val) => println!(
+                                        "json_val={}",
+                                        serde_json::to_string_pretty(&json_val).unwrap()
+                                    ),
+                                    Err(e) => println!("json_val Err e={}", e),
+                                }
+                            }
+                            Err(e) => println!("Error processing response: e={}", e),
+                        }
                     } else {
                         println!("response status={}", response.status());
                     }
