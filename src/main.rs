@@ -11,6 +11,9 @@ use de_string_or_number::{de_string_or_number_to_f64, de_string_or_number_to_u64
 mod signature_binance;
 use signature_binance::{binance_signature, query_vec_u8};
 
+mod account_info;
+use account_info::AccountInfo;
+
 #[derive(Debug, Deserialize, Serialize)]
 struct AvgPrice {
     #[serde(deserialize_with = "de_string_or_number_to_u64")]
@@ -233,14 +236,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let resp_json = response.text().await;
                         match resp_json {
                             Ok(resp) => {
-                                let val: Result<serde_json::Value, _> = serde_json::from_str(&resp);
-                                match val {
-                                    Ok(json_val) => println!(
-                                        "json_val={}",
-                                        serde_json::to_string_pretty(&json_val).unwrap()
-                                    ),
-                                    Err(e) => println!("json_val Err e={}", e),
-                                }
+                                let account_info: AccountInfo = match serde_json::from_str(&resp) {
+                                    Ok(info) => info,
+                                    Err(e) => panic!("Error processing response: e={}", e),
+                                };
+                                println!("account_info={:#?}", account_info);
                             }
                             Err(e) => println!("Error processing response: e={}", e),
                         }
