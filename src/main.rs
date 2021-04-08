@@ -183,11 +183,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("resp={:#?}", &resp);
             match resp {
                 Ok(response) => {
-                    if response.status() == 200 {
-                        let resp_json = response.text().await?;
-                        println!("resp_json={}", resp_json);
+                    let response_status = response.status();
+                    let response_body = response.text().await?;
+                    if response_status == 200 {
+                        println!("response_body={}", response_body);
                     } else {
-                        println!("response status={}", response.status());
+                        println!("response status={} body={}", response_status, response_body);
                     }
                 }
                 Err(err) => println!("err: {}", err),
@@ -232,20 +233,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("resp={:#?}", &resp);
             match resp {
                 Ok(response) => {
-                    if response.status() == 200 {
-                        let resp_json = response.text().await;
-                        match resp_json {
-                            Ok(resp) => {
-                                let account_info: AccountInfo = match serde_json::from_str(&resp) {
-                                    Ok(info) => info,
-                                    Err(e) => panic!("Error processing response: e={}", e),
-                                };
-                                println!("account_info={:#?}", account_info);
-                            }
-                            Err(e) => println!("Error processing response: e={}", e),
-                        }
+                    let response_status = response.status();
+                    let response_body = response.text().await?;
+                    if response_status == 200 {
+                        let account_info: AccountInfo = match serde_json::from_str(&response_body) {
+                            Ok(info) => info,
+                            Err(e) => panic!(
+                                "Error converting body to AccountInfo: e={} body={}",
+                                e, response_body
+                            ),
+                        };
+                        println!("account_info={:#?}", account_info);
                     } else {
-                        println!("response status={}", response.status());
+                        println!("response status={} body={}", response_status, response_body);
                     }
                 }
                 Err(err) => println!("err: {}", err),

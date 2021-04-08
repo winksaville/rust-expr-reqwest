@@ -47,7 +47,6 @@ mod test {
 
     use hex_literal::hex;
 
-
     use super::*;
     //use test::Bencher;
 
