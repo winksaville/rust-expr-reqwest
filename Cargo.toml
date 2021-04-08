@@ -16,5 +16,7 @@ hmac = "0.10.1"
 sha2 = "0.9.3"
 hex = "0.4.3"
 chrono = "0.4.19"
+strum = { version="0.20.0", features = ["derive"] }
+strum_macros = "0.20.1"
 
 [dev-dependencies]

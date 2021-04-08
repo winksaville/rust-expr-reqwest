@@ -5,6 +5,8 @@ use hex;
 use reqwest;
 use serde::{Deserialize, Serialize};
 
+use strum_macros::IntoStaticStr;
+
 mod de_string_or_number;
 use de_string_or_number::{de_string_or_number_to_f64, de_string_or_number_to_u64};
 
@@ -28,11 +30,16 @@ fn time_ms_utc_now() -> i64 {
 }
 
 fn append_signature(query: &mut Vec<u8>, signature: [u8; 32]) {
+    const DEBUG: bool = false;
     let signature_string = hex::encode(&signature);
-    println!("signature_string={}", signature_string);
+    if DEBUG {
+        println!("signature_string={}", signature_string);
+    }
 
     let signature_params = vec![("signature", signature_string.as_str())];
-    println!("signature_params={:?}", signature_params);
+    if DEBUG {
+        println!("signature_params={:?}", signature_params);
+    }
     query.append(&mut vec![b'&']);
     query.append(&mut query_vec_u8(&signature_params));
 }
@@ -54,6 +61,99 @@ fn get_env_var(key: &str) -> String {
     value
 }
 
+#[derive(IntoStaticStr)]
+pub enum Side {
+    BUY,
+    SELL,
+}
+
+async fn binance_market_order_or_test(
+    symbol: &str,
+    side: Side,
+    quantity: f64,
+    test: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    const DEBUG: bool = false;
+
+    let sig_key = get_env_var("SECRET_KEY").into_bytes();
+    let api_key = get_env_var("API_KEY");
+
+    let side_str: &str = side.into();
+    let quantity_str: &str = &format!("{}", quantity);
+
+    println!(
+        "binance_market_order_or_test: symbol={} side={} quantity={} test={}",
+        symbol, side_str, quantity_str, test
+    );
+
+    let mut params = vec![
+        ("symbol", symbol),
+        ("side", side_str),
+        ("type", "MARKET"),
+        ("quantity", quantity_str),
+        ("recvWindow", "5000"),
+    ];
+    let ts_string: String = format!("{}", time_ms_utc_now());
+    params.append(&mut vec![("timestamp", ts_string.as_str())]);
+
+    let mut query = query_vec_u8(&params);
+
+    // Calculate the signature using sig_key and the data is qs and query as body
+    let signature = binance_signature(&sig_key, &vec![], &query);
+
+    // Append the signature to query
+    append_signature(&mut query, signature);
+
+    // Convert to a string
+    let query_string = String::from_utf8(query).unwrap();
+    if DEBUG {
+        println!("query_string={}", &query_string);
+    }
+
+    let path = if test {
+        "/api/v3/order/test"
+    } else {
+        "/api/v3/order"
+    };
+    let url = "https://api.binance.us".to_string() + path;
+
+    // Build request
+    let client = reqwest::Client::builder();
+    let req_builder = client
+        .proxy(reqwest::Proxy::https("http://localhost:8080")?)
+        .build()?
+        .post(url)
+        .header("X-MBX-APIKEY", api_key)
+        .body(query_string);
+    if DEBUG {
+        println!("req_builder={:#?}", req_builder);
+    }
+
+    // Send and get response
+    let response = req_builder.send().await?;
+    if DEBUG {
+        println!("response={:#?}", &response);
+    }
+    let response_status = response.status();
+    let response_body = response.text().await?;
+    if response_status == 200 {
+        if DEBUG {
+            println!("response_body={}", response_body);
+        }
+        Ok(())
+    } else {
+        Err(format!(
+            "Error response status={} symbol={} side={} quantity={} body={}",
+            response_status, symbol, side_str, quantity_str, response_body
+        ))?
+    }
+}
+
+//async fn binance_market_order(symbol: &str, side: Side, quantity: f64) -> Result<(), Box<dyn std::error::Error>> {
+//    //return binance_market_order_or_test(symbol, side, quantity, false);
+//    Ok(())
+//}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let path =
@@ -63,7 +163,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ;
 
     // Some variant implementations
-    match 5u8 {
+    match 6u8 {
         0 => {
             // For POST's use binance.us
             let url = "https://binance.us".to_string() + path;
@@ -138,63 +238,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         4 => {
-            println!("Order Test");
-
-            let sig_key = get_env_var("SECRET_KEY").into_bytes();
-            let api_key = get_env_var("API_KEY");
-
-            let mut params = vec![
-                ("symbol", "BTCUSD"),
-                ("side", "BUY"),
-                ("type", "MARKET"),
-                ("quantity", "0.0002"),
-                ("recvWindow", "5000"),
-            ];
-            let ts_string: String = format!("{}", time_ms_utc_now());
-            params.append(&mut vec![("timestamp", ts_string.as_str())]);
-
-            let mut query = query_vec_u8(&params);
-
-            // Calculate the signature using sig_key and the data is qs and query as body
-            let signature = binance_signature(&sig_key, &vec![], &query);
-
-            // Append the signature to query
-            append_signature(&mut query, signature);
-
-            // Convert to a string
-            let query_string = String::from_utf8(query).unwrap();
-            println!("query_string={}", &query_string);
-
-            let path = "/api/v3/order/test";
-            let url = "https://api.binance.us".to_string() + path;
-
-            // Build request
-            let client = reqwest::Client::builder();
-            let req_builder = client
-                .proxy(reqwest::Proxy::https("http://localhost:8080")?)
-                .build()?
-                .post(url)
-                .header("X-MBX-APIKEY", api_key)
-                .body(query_string);
-            println!("req_builder={:#?}", req_builder);
-
-            // Send and get response
-            let resp = req_builder.send().await;
-            println!("resp={:#?}", &resp);
-            match resp {
-                Ok(response) => {
-                    let response_status = response.status();
-                    let response_body = response.text().await?;
-                    if response_status == 200 {
-                        println!("response_body={}", response_body);
-                    } else {
-                        println!("response status={} body={}", response_status, response_body);
-                    }
-                }
-                Err(err) => println!("err: {}", err),
-            }
+            println!("Order Test Success");
+            binance_market_order_or_test("BNBUSD", Side::BUY, 0.03, true).await?;
         }
         5 => {
+            println!("Order Test failure");
+            binance_market_order_or_test("BNB", Side::BUY, 0.03, true).await?;
+        }
+        6 => {
             println!("Get Account Information");
 
             let sig_key = get_env_var("SECRET_KEY").into_bytes();
@@ -250,6 +301,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 Err(err) => println!("err: {}", err),
             }
+        }
+        255 => {
+            println!("Order BNBUSD");
+            binance_market_order_or_test("BNBUSD", Side::BUY, 0.03, false).await?;
         }
         _ => {
             Err("Bad variant")? // From: https://stackoverflow.com/a/55125216/4812090
