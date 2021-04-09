@@ -1,5 +1,7 @@
 #![feature(test)]
 
+use std::env;
+
 use chrono::prelude::*;
 use hex;
 use reqwest;
@@ -48,7 +50,7 @@ fn append_signature(query: &mut Vec<u8>, signature: [u8; 32]) {
 }
 
 fn get_env_var(key: &str) -> String {
-    let value = match std::env::var(key) {
+    let value = match env::var(key) {
         Ok(val) => {
             if val.len() > 0 {
                 val
@@ -171,14 +173,22 @@ async fn binance_market_order_or_test(
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Quick and dirty variant selection
+    let args: Vec<String> = env::args().collect();
+    if args.len() == 1 {
+        println!("Usage:");
+        println!("{}: <variant>", args[0]);
+        println!(" variant 0 .. 7, 254, 255)");
+        return Ok(());
+    }
+    let variant: i32 = args[1].parse().unwrap();
+
     let path =
         "/api/v3/avgPrice?symbol=BTCUSDT"
         //"/api/v3/depth?symbol=BTCUSDT&limit=5"
-        //"/api/v3/exchangeInfo"
     ;
 
     // Some variant implementations
-    let variant = 255;
     match variant {
         0 => {
             // For POST's use binance.us
@@ -258,16 +268,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let url = "https://api.binance.us/api/v3/exchangeInfo".to_string();
 
             // Using value
-            let resp_json = reqwest::Client::new()
-                .get(url)
-                .send()
-                .await?
-                .text()
-                .await?;
-            println!("resp_json={:#?}", resp_json);
+            let resp_json = reqwest::Client::new().get(url).send().await?.text().await?;
 
             let ei: serde_json::Value = serde_json::from_str(&resp_json).unwrap();
-            println!("ei={:#?}", ei);
+            println!("ei={}", serde_json::to_string_pretty(&ei).unwrap());
         }
         5 => {
             println!("Get Account Information");
