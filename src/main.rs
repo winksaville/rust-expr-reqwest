@@ -16,6 +16,9 @@ use signature_binance::{binance_signature, query_vec_u8};
 mod account_info;
 use account_info::AccountInfo;
 
+mod order_response;
+use order_response::OrderResponse;
+
 #[derive(Debug, Deserialize, Serialize)]
 struct AvgPrice {
     #[serde(deserialize_with = "de_string_or_number_to_u64")]
@@ -72,7 +75,7 @@ async fn binance_market_order_or_test(
     side: Side,
     quantity: f64,
     test: bool,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<OrderResponse, Box<dyn std::error::Error>> {
     const DEBUG: bool = false;
 
     let sig_key = get_env_var("SECRET_KEY").into_bytes();
@@ -140,7 +143,19 @@ async fn binance_market_order_or_test(
         if DEBUG {
             println!("response_body={}", response_body);
         }
-        Ok(())
+        let mut order_resp = OrderResponse::default();
+        if !test {
+            order_resp = serde_json::from_str(&&response_body)?;
+        } else {
+            order_resp.test = true;
+        }
+        if DEBUG {
+            println!(
+                "binance_market_order_or_test: symbol={} side={} quantity={} test={} order_response={:#?}",
+                symbol, side_str, quantity_str, test, order_resp
+            );
+        }
+        Ok(order_resp)
     } else {
         Err(format!(
             "Error response status={} symbol={} side={} quantity={} body={}",
@@ -163,7 +178,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ;
 
     // Some variant implementations
-    match 6u8 {
+    let variant = 255;
+    match variant {
         0 => {
             // For POST's use binance.us
             let url = "https://binance.us".to_string() + path;
@@ -238,14 +254,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         4 => {
-            println!("Order Test Success");
-            binance_market_order_or_test("BNBUSD", Side::BUY, 0.03, true).await?;
+            println!("Get Exchange Information");
+            let url = "https://api.binance.us/api/v3/exchangeInfo".to_string();
+
+            // Using value
+            let resp_json = reqwest::Client::new()
+                .get(url)
+                .send()
+                .await?
+                .text()
+                .await?;
+            println!("resp_json={:#?}", resp_json);
+
+            let ei: serde_json::Value = serde_json::from_str(&resp_json).unwrap();
+            println!("ei={:#?}", ei);
         }
         5 => {
-            println!("Order Test failure");
-            binance_market_order_or_test("BNB", Side::BUY, 0.03, true).await?;
-        }
-        6 => {
             println!("Get Account Information");
 
             let sig_key = get_env_var("SECRET_KEY").into_bytes();
@@ -302,9 +326,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Err(err) => println!("err: {}", err),
             }
         }
+        6 => {
+            println!("Order Test success");
+            let order_response =
+                binance_market_order_or_test("BNBUSD", Side::BUY, 0.03, true).await?;
+            println!("Order Test success BNBUSD response={:#?}", order_response);
+        }
+        7 => {
+            println!("Order Test failure");
+            binance_market_order_or_test("BNB", Side::BUY, 0.03, true).await?;
+            panic!("Should NEVER get here!");
+        }
+        254 => {
+            println!("Buy Order BNBUSD");
+            let order_response =
+                binance_market_order_or_test("BNBUSD", Side::BUY, 0.04, false).await?;
+            println!("Buy Order BNBUSD response={:#?}", order_response);
+        }
         255 => {
-            println!("Order BNBUSD");
-            binance_market_order_or_test("BNBUSD", Side::BUY, 0.03, false).await?;
+            println!("Sell Order BNBUSD");
+            let order_response =
+                binance_market_order_or_test("BNBUSD", Side::SELL, 0.06, false).await?;
+            println!("Sell Order BNBUSD response={:#?}", order_response);
         }
         _ => {
             Err("Bad variant")? // From: https://stackoverflow.com/a/55125216/4812090
