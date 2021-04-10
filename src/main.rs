@@ -21,6 +21,9 @@ use account_info::AccountInfo;
 mod order_response;
 use order_response::OrderResponse;
 
+mod exchange_info;
+use exchange_info::ExchangeInfo;
+
 #[derive(Debug, Deserialize, Serialize)]
 struct AvgPrice {
     #[serde(deserialize_with = "de_string_or_number_to_u64")]
@@ -267,11 +270,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("Get Exchange Information");
             let url = "https://api.binance.us/api/v3/exchangeInfo".to_string();
 
-            // Using value
-            let resp_json = reqwest::Client::new().get(url).send().await?.text().await?;
+            let resp = reqwest::Client::new().get(url).send().await?.text().await?;
 
-            let ei: serde_json::Value = serde_json::from_str(&resp_json).unwrap();
-            println!("ei={}", serde_json::to_string_pretty(&ei).unwrap());
+            let exchange_info: ExchangeInfo = match serde_json::from_str(&resp) {
+                Ok(info) => info,
+                Err(e) => panic!(
+                    "Error converting body to AccountInfo: e={} body={}",
+                    e, resp
+                ),
+            };
+            println!("exchange_info={:#?}", exchange_info);
         }
         5 => {
             println!("Get Account Information");
